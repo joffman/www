@@ -1,0 +1,28 @@
+<%init>
+use strict;
+use warnings;
+use DBI;
+use lib qw(/home/janosch/perl/);
+use SmartGWT::Response;
+use SmartGWT::StatusCodes;
+</%init>
+<%perl>
+eval {
+if (!defined($r)) {
+	die("Apache2::RequestRec object is not defined\n");
+}
+
+my $dbh = DBI->connect("dbi:mysql:doit", "doit", "doit",
+	{AutoCommit => 1, RaiseError => 1});
+
+$m->call_next(%ARGS, dbh => $dbh);
+};
+if (my $err_msg = $@) {
+	$err_msg =~ s/\R.*//g;
+	my $response = SmartGWT::Response->new({
+			status => $SmartGWT::StatusCodes::FAILURE,
+			data => $err_msg
+		});
+	print($response->toJsonString());
+}
+</%perl>

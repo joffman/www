@@ -1,0 +1,115 @@
+<%args>
+$dbh
+</%args>
+<%init>
+use strict;
+use warnings;
+use DBI;
+
+use Data::Dumper;
+use lib qw(/home/janosch/perl/);
+use DoIt::TableHandler;
+use SmartGWT::RequestParsing qw(read_post_body);
+use SmartGWT::Response;
+use MyUtils::ArgumentValidation qw(assertArgsExist);
+</%init>
+<%perl>
+eval {
+	$r->content_type("application/json");
+	
+	# Parse post body.
+	my $post_body = read_post_body($r);
+	my $data = $post_body->{data};
+	my $operation_type = $post_body->{operationType};
+
+	# Create table-handler.
+	my $table_handler = DoIt::TableHandler->createForDataSource({
+			datasource => $post_body->{dataSource},
+			dbh => $dbh
+		});
+
+	# Process request with given operation-type.
+	if ($operation_type eq "add") {
+		# The validation is done in the frontend.
+
+		# Insert new record into database.
+		my $id = $table_handler->insertRecord({
+					record => $data
+				});
+
+		# Fetch inserted record.
+		my $record = $table_handler->fetchRecordWithIdAsHashref({
+					id => $id
+				});
+
+		# Return inserted record in response.
+		my $response = SmartGWT::Response->new();
+		$response->addDataRecord($record);
+		print($response->toJsonString());
+	}
+	elsif ($operation_type eq "fetch") {
+		# Fetch all records in range [start_row, end_row).
+		my $start_row = $post_body->{startRow};	# inclusive
+		my $end_row = $post_body->{endRow};		# exclusive
+		my $records = $table_handler->fetchRecordsInRange({
+				start_row => $start_row,
+				end_row_excl => $end_row,
+				criteria => $data
+			});
+		
+		# Recompute end-row if necessary.
+		my $total_rows = $table_handler->getTotalRows({
+				criteria => $data
+				});
+		if ($total_rows < $end_row) {
+			$end_row = $total_rows;
+		}
+
+		# Return records in response.
+		my $response = SmartGWT::Response->new({
+				data => $records,
+				startRow => $start_row,
+				endRow => $end_row,
+				totalRows => $total_rows
+			});
+		print($response->toJsonString());
+	}
+	elsif ($operation_type eq "remove") {
+		my $id = $data->{id};
+		$table_handler->removeRecordWithId({ id => $id });
+		
+		# Send response.
+		# The response only has to include the primary key of the deleted record.
+		my $response = SmartGWT::Response->new();
+		$response->addDataRecord({ id => $id });
+		print($response->toJsonString());
+	}
+	elsif ($operation_type eq "update") {
+		my $id = $table_handler->updateRecord({
+				record => $data
+			});
+	
+		# Fetch updated record.
+		my $record = $table_handler->fetchRecordWithIdAsHashref({
+					id => $id
+				});
+
+		# Print response with updated record.
+		my $response = new SmartGWT::Response();
+		$response->addDataRecord($record);
+		print($response->toJsonString());
+	}
+	else {
+		die("unknown operation type\n");
+	}
+};
+if (my $err_msg = $@) {
+	$err_msg .= "";		# $@ seems to be an object, so convert it to string
+	my $response = SmartGWT::Response->new({
+			status => $SmartGWT::StatusCodes::FAILURE,
+			data => $err_msg
+		});
+	print($response->toJsonString());
+}
+
+</%perl>
