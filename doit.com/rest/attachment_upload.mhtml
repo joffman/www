@@ -1,0 +1,49 @@
+<%args>
+$dbh
+</%args>
+<%init>
+use strict;
+use warnings;
+
+use Apache2::Request;
+use Apache2::Upload;	# !necessary; otherwise, $r->upload() does not return an Apache2::Upload object
+use POSIX qw(strftime);
+use Data::Dumper;
+use lib qw(/home/janosch/perl/);
+use SmartGWT::RequestParsing qw(read_post_body);
+use SmartGWT::Response;
+</%init>
+<%perl>
+eval {
+	$r->content_type("application/json");
+
+	# Get task-id.
+	my $task_id = $r->param("task_id");
+
+	# Get file name and contents.
+	my $upload = $r->upload("attachment");
+	my $upload_fh = $upload->fh();
+	my $filename = $upload->filename();
+	
+	my $file_contents;
+	$upload->slurp($file_contents);
+
+	# Insert attachment into database.
+	my $sth = $dbh->prepare(
+			"INSERT INTO task_attachment (filename, data, task_id, user_id, uploaded_datetime)
+			VALUES (?, ?, ?, ?, ?)");
+	$sth->execute($filename, $file_contents, $task_id, 25,	# TODO: use user_id from session
+			strftime("%F %T", localtime()));
+
+	# TODO Return valid json response.
+};
+if (my $err_msg = $@) {
+	$err_msg .= "";		# $@ seems to be an object, so convert it to string
+	my $response = SmartGWT::Response->new({
+			status => $SmartGWT::StatusCodes::FAILURE,
+			data => $err_msg
+		});
+	print($response->toJsonString());
+}
+
+</%perl>
