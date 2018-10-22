@@ -17,6 +17,7 @@ my $dbh = DBI->connect("dbi:mysql:doit", "doit", "doit",
 
 $m->call_next(%ARGS, dbh => $dbh);
 };
+$@->rethrow() if $m->aborted();		# needed for redirect; see https://mason-users.narkive.com/eWRlnXTH/weird-request-abort-error
 if (my $err_msg = $@) {
 	$err_msg =~ s/\R.*//g;
 	my $response = SmartGWT::Response->new({

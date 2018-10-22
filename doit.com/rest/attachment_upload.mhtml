@@ -15,7 +15,7 @@ use SmartGWT::Response;
 </%init>
 <%perl>
 eval {
-	$r->content_type("application/json");
+	#$r->content_type("application/json");
 
 	# Get task-id.
 	my $task_id = $r->param("task_id");
@@ -36,14 +36,16 @@ eval {
 			strftime("%F %T", localtime()));
 
 	# TODO Return valid json response.
+	$m->redirect("/DoIt.html");
 };
-if (my $err_msg = $@) {
-	$err_msg .= "";		# $@ seems to be an object, so convert it to string
-	my $response = SmartGWT::Response->new({
-			status => $SmartGWT::StatusCodes::FAILURE,
-			data => $err_msg
-		});
-	print($response->toJsonString());
-}
+$@->rethrow() if $m->aborted();
+#if (my $err_msg = $@) {
+	#$err_msg .= "";		# $@ seems to be an object, so convert it to string
+#	my $response = SmartGWT::Response->new({
+#			status => $SmartGWT::StatusCodes::FAILURE,
+#			data => $err_msg
+#		});
+	#print($response->toJsonString());
+#}
 
 </%perl>
